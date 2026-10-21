@@ -1,0 +1,619 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="color-scheme" content="light" />
+    <link rel="icon" href="data:," />
+    <title>Negation Bubble Pop Game</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <style>
+      :root {
+        --ink: #21304d;
+        --ink-soft: #4a5a78;
+        --card: #ffffff;
+        --accent: #ff5d8f;
+        --accent-dark: #e63e74;
+        --sun: #ffb703;
+        --go: #2ec4b6;
+        --go-dark: #1ea396;
+        --bar-track: #dce9ff;
+        --bar-fill: #ff5d8f;
+        --shadow: 0 10px 24px rgba(33, 48, 77, 0.18);
+      }
+      * { box-sizing: border-box; }
+      html, body { height: 100%; }
+      body {
+        margin: 0;
+        font-family: "Fredoka", "Comic Sans MS", system-ui, sans-serif;
+        color: var(--ink);
+        background: linear-gradient(180deg, #7ec8ff 0%, #aee3ff 42%, #e3f7ff 100%);
+        overflow-x: hidden;
+        -webkit-tap-highlight-color: transparent;
+      }
+      /* Decorative drifting clouds */
+      .cloud {
+        position: fixed;
+        background: #ffffff;
+        border-radius: 999px;
+        opacity: 0.75;
+        pointer-events: none;
+        z-index: 0;
+      }
+      .cloud::before, .cloud::after {
+        content: "";
+        position: absolute;
+        background: #ffffff;
+        border-radius: 50%;
+      }
+      .cloud.c1 { width: 130px; height: 42px; top: 12%; left: -140px; animation: drift 46s linear infinite; }
+      .cloud.c1::before { width: 58px; height: 58px; top: -28px; left: 20px; }
+      .cloud.c1::after { width: 42px; height: 42px; top: -18px; left: 66px; }
+      .cloud.c2 { width: 96px; height: 34px; top: 30%; left: -110px; animation: drift 62s linear infinite; animation-delay: -22s; }
+      .cloud.c2::before { width: 44px; height: 44px; top: -20px; left: 14px; }
+      .cloud.c2::after { width: 32px; height: 32px; top: -13px; left: 50px; }
+      .cloud.c3 { width: 160px; height: 48px; top: 6%; left: -180px; animation: drift 74s linear infinite; animation-delay: -50s; opacity: 0.55; }
+      .cloud.c3::before { width: 70px; height: 70px; top: -34px; left: 26px; }
+      .cloud.c3::after { width: 50px; height: 50px; top: -22px; left: 84px; }
+      @keyframes drift { from { transform: translateX(0); } to { transform: translateX(120vw); } }
+
+      .wrap {
+        position: relative;
+        z-index: 1;
+        max-width: 760px;
+        margin: 0 auto;
+        padding: 16px 16px 40px;
+        min-height: 100dvh;
+        display: flex;
+        flex-direction: column;
+      }
+
+      /* Top status bar */
+      .statusbar {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        background: var(--card);
+        border-radius: 20px;
+        padding: 10px 16px;
+        box-shadow: var(--shadow);
+      }
+      .round-label {
+        font-weight: 700;
+        font-size: 1.05rem;
+        white-space: nowrap;
+      }
+      .progress-track {
+        flex: 1;
+        height: 18px;
+        background: var(--bar-track);
+        border-radius: 999px;
+        overflow: hidden;
+      }
+      .progress-fill {
+        height: 100%;
+        width: 0%;
+        background: repeating-linear-gradient(45deg, var(--bar-fill) 0 14px, #ff7ba6 14px 28px);
+        border-radius: 999px;
+        transition: width 0.5s ease;
+      }
+      .score-pill {
+        background: #fff4d6;
+        border: 3px solid var(--sun);
+        color: #8a5a00;
+        font-weight: 700;
+        font-size: 1.05rem;
+        border-radius: 999px;
+        padding: 4px 14px;
+        white-space: nowrap;
+      }
+
+      /* Mission banner */
+      .mission {
+        margin-top: 20px;
+        background: var(--card);
+        border-radius: 26px;
+        box-shadow: var(--shadow);
+        padding: 20px 18px;
+        text-align: center;
+      }
+      .mission h1 {
+        margin: 0;
+        font-size: clamp(1.5rem, 5.4vw, 2.3rem);
+        font-weight: 700;
+        line-height: 1.2;
+      }
+      .mission .not-word {
+        color: var(--accent-dark);
+        background: #ffe3ec;
+        border-radius: 12px;
+        padding: 0 10px;
+        display: inline-block;
+      }
+      .feedback {
+        min-height: 2rem;
+        margin-top: 10px;
+        font-size: clamp(1.05rem, 3.6vw, 1.3rem);
+        font-weight: 600;
+        color: var(--ink-soft);
+      }
+      .feedback.oops { color: #d96c00; }
+      .feedback.yay { color: var(--go-dark); }
+
+      /* Bubble field */
+      .field {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: clamp(10px, 4vw, 34px);
+        padding: 30px 4px 10px;
+        flex-wrap: nowrap;
+      }
+      .bubble {
+        position: relative;
+        width: clamp(104px, 27vw, 168px);
+        height: clamp(104px, 27vw, 168px);
+        border-radius: 50%;
+        border: none;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: clamp(52px, 13.5vw, 84px);
+        line-height: 1;
+        box-shadow: inset -14px -18px 28px rgba(255,255,255,0.35), inset 10px 12px 24px rgba(255,255,255,0.75), 0 14px 26px rgba(33,48,77,0.22);
+        transition: transform 0.15s ease;
+        touch-action: manipulation;
+        user-select: none;
+        -webkit-user-select: none;
+      }
+      .bubble::after {
+        content: "";
+        position: absolute;
+        top: 13%;
+        left: 16%;
+        width: 30%;
+        height: 20%;
+        background: rgba(255,255,255,0.85);
+        border-radius: 50%;
+        transform: rotate(-24deg);
+        pointer-events: none;
+      }
+      .bubble:active { transform: scale(0.93); }
+      .bubble.b0 { background: radial-gradient(circle at 32% 30%, #ffd9e8, #ff8fb8 78%); }
+      .bubble.b1 { background: radial-gradient(circle at 32% 30%, #d3f6ff, #6fc7ff 78%); }
+      .bubble.b2 { background: radial-gradient(circle at 32% 30%, #e6ffd9, #8fe388 78%); }
+      /* The picture inside bobs gently; the bubble itself stays a steady, easy tap target. */
+      .bob {
+        display: inline-block;
+        animation: floaty 3.4s ease-in-out infinite;
+        pointer-events: none;
+      }
+      .b0 .bob { animation-delay: 0s; }
+      .b1 .bob { animation-delay: -1.2s; animation-duration: 3.9s; }
+      .b2 .bob { animation-delay: -2.3s; animation-duration: 3.1s; }
+      @keyframes floaty {
+        0%, 100% { transform: translateY(5px) rotate(-2deg); }
+        50% { transform: translateY(-9px) rotate(2deg); }
+      }
+      .bubble.wiggle { animation: wiggle 0.5s ease; }
+      @keyframes wiggle {
+        0%, 100% { transform: translateX(0) rotate(0deg); }
+        20% { transform: translateX(-9px) rotate(-5deg); }
+        40% { transform: translateX(9px) rotate(5deg); }
+        60% { transform: translateX(-7px) rotate(-4deg); }
+        80% { transform: translateX(7px) rotate(4deg); }
+      }
+      .bubble.popped {
+        animation: burst 0.28s ease forwards;
+        pointer-events: none;
+      }
+      @keyframes burst {
+        0% { transform: scale(1); opacity: 1; }
+        55% { transform: scale(1.28); opacity: 0.9; }
+        100% { transform: scale(1.65); opacity: 0; }
+      }
+      .bubble.dim { opacity: 0.45; pointer-events: none; }
+
+      /* Confetti particles */
+      .confetti-bit {
+        position: fixed;
+        width: 12px;
+        height: 12px;
+        z-index: 50;
+        pointer-events: none;
+        border-radius: 3px;
+      }
+
+      /* Say-it panel */
+      .sayit {
+        margin-top: 8px;
+        background: var(--card);
+        border-radius: 26px;
+        box-shadow: var(--shadow);
+        padding: 20px 18px;
+        text-align: center;
+        display: none;
+      }
+      .sayit.show { display: block; animation: rise 0.35s ease; }
+      @keyframes rise { from { transform: translateY(16px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+      .sayit .say-line {
+        font-size: clamp(1.4rem, 5vw, 2rem);
+        font-weight: 700;
+        margin: 0 0 16px;
+      }
+      .sayit .say-line .not-word { color: var(--accent-dark); }
+      .btn-row { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
+      .big-btn {
+        font-family: inherit;
+        font-weight: 700;
+        font-size: clamp(1.15rem, 4.4vw, 1.45rem);
+        border: none;
+        border-radius: 999px;
+        padding: 16px 30px;
+        cursor: pointer;
+        min-height: 64px;
+        box-shadow: 0 6px 0 rgba(0,0,0,0.14), var(--shadow);
+        transition: transform 0.1s ease, box-shadow 0.1s ease;
+        touch-action: manipulation;
+      }
+      .big-btn:active { transform: translateY(4px); box-shadow: 0 2px 0 rgba(0,0,0,0.14); }
+      .btn-say { background: var(--accent); color: #fff; }
+      .btn-said { background: var(--go); color: #fff; display: none; }
+      .btn-said.show { display: inline-block; }
+      .btn-play { background: var(--sun); color: #5c3d00; }
+
+      /* Screens */
+      .screen {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        padding: 24px 10px;
+      }
+      .screen .big-emoji { font-size: clamp(72px, 20vw, 110px); line-height: 1.15; }
+      .screen h2 {
+        margin: 10px 0 6px;
+        font-size: clamp(1.9rem, 7vw, 2.9rem);
+        font-weight: 700;
+      }
+      .screen p {
+        margin: 0 0 26px;
+        font-size: clamp(1.1rem, 4.2vw, 1.35rem);
+        color: var(--ink-soft);
+        font-weight: 500;
+        max-width: 30ch;
+      }
+      .stars { font-size: clamp(2.6rem, 10vw, 4rem); letter-spacing: 6px; margin: 4px 0 10px; }
+      .stars .dim-star { opacity: 0.25; filter: grayscale(1); }
+      .final-score {
+        font-size: clamp(1.4rem, 5.4vw, 1.9rem);
+        font-weight: 700;
+        background: #fff4d6;
+        border: 3px solid var(--sun);
+        border-radius: 999px;
+        padding: 8px 26px;
+        margin-bottom: 28px;
+        color: #8a5a00;
+      }
+      .hidden { display: none !important; }
+
+      @media (prefers-reduced-motion: reduce) {
+        .bubble, .cloud, .bob { animation: none !important; }
+      }
+    </style>
+      <link rel="apple-touch-icon" href="/negation-bubble-pop-game/apple-touch-icon.png">
+</head>
+  <body>
+    <div class="cloud c1"></div>
+    <div class="cloud c2"></div>
+    <div class="cloud c3"></div>
+
+    <div class="wrap">
+      <!-- Status bar -->
+      <div class="statusbar" id="statusbar">
+        <div class="round-label" id="roundLabel">Round 1 of 12</div>
+        <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+        <div class="score-pill">⭐ <span id="scoreText">0</span></div>
+      </div>
+
+      <!-- Start screen -->
+      <div class="screen" id="startScreen">
+        <div class="big-emoji">🫧🐄🫧</div>
+        <h2>NOT Bubble Pop!</h2>
+        <p>Each round shows 3 different pictures. Pop the ONE that is <strong>NOT</strong> what the mission says!</p>
+        <button class="big-btn btn-play" id="startBtn" type="button">▶️ Let's Play!</button>
+      </div>
+
+      <!-- Game screen -->
+      <div id="gameScreen" class="hidden">
+        <div class="mission">
+          <h1 id="missionText"></h1>
+          <div class="feedback" id="feedback">Tap a bubble to pop it!</div>
+        </div>
+        <div class="field" id="field"></div>
+        <div class="sayit" id="sayitPanel">
+          <p class="say-line" id="sayLine"></p>
+          <div class="btn-row">
+            <button class="big-btn btn-say" id="sayBtn" type="button">🔊 Say it!</button>
+            <button class="big-btn btn-said" id="saidBtn" type="button">🗣️ I said it! +100</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Win screen -->
+      <div class="screen hidden" id="winScreen">
+        <div class="big-emoji">🎉🏆🎉</div>
+        <h2>You Did It!</h2>
+        <div class="stars" id="starsRow"></div>
+        <div class="final-score">⭐ <span id="finalScore">0</span> points</div>
+        <p>Great job popping all the NOT bubbles!</p>
+        <button class="big-btn btn-play" id="againBtn" type="button">🔁 Play Again</button>
+      </div>
+    </div>
+
+    <script>
+      var CATEGORIES = [
+        { key: "animal", phrase: "an animal", items: [
+          { name: "cow",  emoji: "🐄" },
+          { name: "pig",  emoji: "🐷" },
+          { name: "dog",  emoji: "🐶" },
+          { name: "cat",  emoji: "🐱" },
+          { name: "fish", emoji: "🐟" },
+          { name: "bird", emoji: "🐦" }
+        ] },
+        { key: "food", phrase: "a food", items: [
+          { name: "donut",  emoji: "🍩" },
+          { name: "apple",  emoji: "🍎" },
+          { name: "cookie", emoji: "🍪" },
+          { name: "banana", emoji: "🍌" },
+          { name: "cake",   emoji: "🍰" },
+          { name: "pizza",  emoji: "🍕" }
+        ] },
+        { key: "toy", phrase: "a toy", items: [
+          { name: "ball",       emoji: "⚽" },
+          { name: "car",        emoji: "🚗" },
+          { name: "kite",       emoji: "🪁" },
+          { name: "teddy bear", emoji: "🧸" },
+          { name: "balloon",    emoji: "🎈" },
+          { name: "rocket",     emoji: "🚀" }
+        ] }
+      ];
+      var TOTAL_ROUNDS = 12;
+      var CONFETTI_COLORS = ["#ff5d8f", "#ffb703", "#2ec4b6", "#6fc7ff", "#b388ff", "#8fe388"];
+
+      var rounds = [];
+      var roundIndex = 0;
+      var score = 0;
+      var roundDone = false;
+      var current = null;
+
+      var roundLabel = document.getElementById("roundLabel");
+      var progressFill = document.getElementById("progressFill");
+      var scoreText = document.getElementById("scoreText");
+      var missionText = document.getElementById("missionText");
+      var feedback = document.getElementById("feedback");
+      var field = document.getElementById("field");
+      var sayitPanel = document.getElementById("sayitPanel");
+      var sayLine = document.getElementById("sayLine");
+      var sayBtn = document.getElementById("sayBtn");
+      var saidBtn = document.getElementById("saidBtn");
+      var startScreen = document.getElementById("startScreen");
+      var gameScreen = document.getElementById("gameScreen");
+      var winScreen = document.getElementById("winScreen");
+      var statusbar = document.getElementById("statusbar");
+
+      function shuffle(arr) {
+        var a = arr.slice();
+        for (var i = a.length - 1; i > 0; i--) {
+          var j = Math.floor(Math.random() * (i + 1));
+          var t = a[i]; a[i] = a[j]; a[j] = t;
+        }
+        return a;
+      }
+
+      function buildRounds() {
+        // Mission plan: 4 rounds per category ("NOT an animal", "NOT a food",
+        // "NOT a toy"), shuffled so the missions mix up.
+        var plan = shuffle([
+          CATEGORIES[0], CATEGORIES[0], CATEGORIES[0], CATEGORIES[0],
+          CATEGORIES[1], CATEGORIES[1], CATEGORIES[1], CATEGORIES[1],
+          CATEGORIES[2], CATEGORIES[2], CATEGORIES[2], CATEGORIES[2]
+        ]);
+        rounds = plan.map(function (cat) {
+          // Two pictures that ARE in the category...
+          var members = shuffle(cat.items).slice(0, 2);
+          // ...and exactly ONE that is NOT — it comes from a different category,
+          // so all three pictures are different and there is one correct pop.
+          var otherCats = CATEGORIES.filter(function (c) { return c.key !== cat.key; });
+          var otherCat = otherCats[Math.floor(Math.random() * otherCats.length)];
+          var answer = otherCat.items[Math.floor(Math.random() * otherCat.items.length)];
+          var slots = shuffle([
+            { item: members[0], isAnswer: false },
+            { item: members[1], isAnswer: false },
+            { item: answer, isAnswer: true }
+          ]);
+          return { category: cat, answer: answer, slots: slots };
+        });
+      }
+
+      function updateStatus() {
+        roundLabel.textContent = "Round " + Math.min(roundIndex + 1, TOTAL_ROUNDS) + " of " + TOTAL_ROUNDS;
+        progressFill.style.width = (roundIndex / TOTAL_ROUNDS * 100) + "%";
+        scoreText.textContent = score;
+      }
+
+      function startRound() {
+        roundDone = false;
+        current = rounds[roundIndex];
+        updateStatus();
+
+        missionText.innerHTML =
+          "Pop the bubble that is <span class=\"not-word\">NOT</span> " +
+          current.category.phrase + "!";
+        feedback.textContent = "Tap a bubble to pop it!";
+        feedback.className = "feedback";
+        sayitPanel.classList.remove("show");
+        saidBtn.classList.remove("show");
+
+        field.innerHTML = "";
+        current.slots.forEach(function (slot, i) {
+          var b = document.createElement("button");
+          b.type = "button";
+          b.className = "bubble b" + i;
+          b.innerHTML = "<span class=\"bob\">" + slot.item.emoji + "</span>";
+          b.setAttribute("aria-label", "bubble with " + slot.item.name);
+          b.addEventListener("click", function () { onBubbleTap(b, slot); });
+          field.appendChild(b);
+        });
+      }
+
+      function onBubbleTap(bubbleEl, slot) {
+        if (roundDone) return;
+        if (slot.isAnswer) {
+          // Correct — this is the one bubble that is NOT in the category.
+          roundDone = true;
+          score += 100;
+          scoreText.textContent = score;
+          bubbleEl.classList.add("popped");
+          burstConfetti(bubbleEl);
+          playPop();
+          var others = field.querySelectorAll(".bubble");
+          others.forEach(function (el) { if (el !== bubbleEl) el.classList.add("dim"); });
+          feedback.textContent = "🎉 Yes! The " + slot.item.name + " is NOT " + current.category.phrase + "! +100";
+          feedback.className = "feedback yay";
+          sayLine.innerHTML = "Say: <span class=\"not-word\">NOT</span> " + current.category.phrase + "!";
+          sayitPanel.classList.add("show");
+        } else {
+          // Gentle correction — no penalty, bubble stays.
+          bubbleEl.classList.remove("wiggle");
+          void bubbleEl.offsetWidth;
+          bubbleEl.classList.add("wiggle");
+          feedback.textContent = "Oops! The " + slot.item.name + " IS " + current.category.phrase + "! Try again! 💪";
+          feedback.className = "feedback oops";
+        }
+      }
+
+      function burstConfetti(fromEl) {
+        var rect = fromEl.getBoundingClientRect();
+        var cx = rect.left + rect.width / 2;
+        var cy = rect.top + rect.height / 2;
+        for (var i = 0; i < 26; i++) {
+          var bit = document.createElement("div");
+          bit.className = "confetti-bit";
+          bit.style.background = CONFETTI_COLORS[i % CONFETTI_COLORS.length];
+          bit.style.left = cx + "px";
+          bit.style.top = cy + "px";
+          if (i % 3 === 0) bit.style.borderRadius = "50%";
+          document.body.appendChild(bit);
+          var angle = Math.random() * Math.PI * 2;
+          var dist = 70 + Math.random() * 130;
+          var dx = Math.cos(angle) * dist;
+          var dy = Math.sin(angle) * dist - 40;
+          var rot = Math.random() * 540 - 270;
+          bit.animate([
+            { transform: "translate(0,0) rotate(0deg)", opacity: 1 },
+            { transform: "translate(" + dx + "px," + (dy + 120) + "px) rotate(" + rot + "deg)", opacity: 0 }
+          ], { duration: 750 + Math.random() * 450, easing: "cubic-bezier(.17,.67,.35,1)" });
+          (function (el) { setTimeout(function () { el.remove(); }, 1300); })(bit);
+        }
+      }
+
+      function bigConfetti() {
+        for (var n = 0; n < 3; n++) {
+          (function (delay) {
+            setTimeout(function () {
+              var fake = { getBoundingClientRect: function () {
+                return { left: window.innerWidth * (0.25 + Math.random() * 0.5), top: window.innerHeight * 0.3, width: 10, height: 10 };
+              } };
+              burstConfetti(fake);
+            }, delay);
+          })(n * 250);
+        }
+      }
+
+      // Little pop sound via WebAudio (no files needed).
+      var audioCtx = null;
+      function playPop() {
+        try {
+          if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+          if (audioCtx.state === "suspended") audioCtx.resume();
+          var osc = audioCtx.createOscillator();
+          var gain = audioCtx.createGain();
+          osc.type = "sine";
+          osc.frequency.setValueAtTime(420, audioCtx.currentTime);
+          osc.frequency.exponentialRampToValueAtTime(920, audioCtx.currentTime + 0.12);
+          gain.gain.setValueAtTime(0.22, audioCtx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.18);
+          osc.connect(gain); gain.connect(audioCtx.destination);
+          osc.start(); osc.stop(audioCtx.currentTime + 0.2);
+        } catch (e) { /* sound is a bonus, never a blocker */ }
+      }
+
+      function speakPhrase() {
+        try {
+          if (!("speechSynthesis" in window)) return;
+          window.speechSynthesis.cancel();
+          var u = new SpeechSynthesisUtterance("NOT " + current.category.phrase + "!");
+          u.rate = 0.92;
+          u.pitch = 1.1;
+          window.speechSynthesis.speak(u);
+        } catch (e) { /* speech is a bonus, never a blocker */ }
+      }
+
+      sayBtn.addEventListener("click", function () {
+        speakPhrase();
+        saidBtn.classList.add("show");
+      });
+
+      saidBtn.addEventListener("click", function () {
+        score += 100;
+        scoreText.textContent = score;
+        roundIndex++;
+        progressFill.style.width = (roundIndex / TOTAL_ROUNDS * 100) + "%";
+        if (roundIndex >= TOTAL_ROUNDS) {
+          showWin();
+        } else {
+          startRound();
+        }
+      });
+
+      function showWin() {
+        gameScreen.classList.add("hidden");
+        winScreen.classList.remove("hidden");
+        roundLabel.textContent = "All 12 rounds done!";
+        document.getElementById("finalScore").textContent = score;
+        var maxScore = TOTAL_ROUNDS * 200;
+        var starCount = score >= maxScore * 0.85 ? 3 : (score >= maxScore * 0.55 ? 2 : 1);
+        var starsHtml = "";
+        for (var i = 0; i < 3; i++) {
+          starsHtml += i < starCount ? "⭐" : "<span class=\"dim-star\">⭐</span>";
+        }
+        document.getElementById("starsRow").innerHTML = starsHtml;
+        bigConfetti();
+      }
+
+      function startGame() {
+        buildRounds();
+        roundIndex = 0;
+        score = 0;
+        scoreText.textContent = "0";
+        startScreen.classList.add("hidden");
+        winScreen.classList.add("hidden");
+        gameScreen.classList.remove("hidden");
+        startRound();
+      }
+
+      document.getElementById("startBtn").addEventListener("click", startGame);
+      document.getElementById("againBtn").addEventListener("click", startGame);
+
+      statusbar.classList.remove("hidden");
+      updateStatus();
+    </script>
+  </body>
+</html>
